@@ -6,8 +6,6 @@ module Niwatori
 
   class Digraph
 
-    include Enumerable
-
     def self.generate(x, y, z, r)
       vertax1 = Vertax[x, y, z]
       edges = r.to_enum(:directions).map do |d|
@@ -29,9 +27,6 @@ module Niwatori
 
     def initialize(edges)
       @edges = edges.to_a
-    end
-
-    def each
     end
     
   end
