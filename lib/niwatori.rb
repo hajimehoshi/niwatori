@@ -24,10 +24,12 @@ module Niwatori
           vertex2.y += 1
         when :go_down
           vertex2.z -= 1
+        when :go_up
+          vertex2.z += 1
         else
           raise "invalid direction"
         end
-        if edges.all?{|e| e.initial != vertex2 and e.terminal != vertex2}
+        if @edges.all?{|e| e.initial != vertex2 and e.terminal != vertex2}
           @edges << Edge.new(vertex1, vertex2)
           @edges << Edge.new(vertex2, vertex1)
           vertex1 = vertex2
