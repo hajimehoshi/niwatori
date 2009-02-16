@@ -8,8 +8,14 @@ module Niwatori
 
     attr_reader :edges
 
-    def initialize(x, y, z, directions)
-      vertex1 = Vertex[x, y, z]
+    def initialize(directions, options)
+      options = {
+        start: [2, 5, 0],
+        size: [6, 6],
+        floors: -6..5,
+      }.merge(options)
+      vertex1 = Vertex[*options[:start]]
+      width, height = *options[:size]
       @edges = []
       directions.each do |direction|
         vertex2 = vertex1.dup
@@ -29,7 +35,10 @@ module Niwatori
         else
           raise "invalid direction"
         end
-        if @edges.all?{|e| e.initial != vertex2 and e.terminal != vertex2}
+        if 0 <= vertex2.x and vertex2.x < width and
+            0 <= vertex2.y and vertex2.y < height and
+            options[:floors].include?(vertex2.z) and
+            @edges.all?{|e| e.initial != vertex2 and e.terminal != vertex2}
           @edges << Edge.new(vertex1, vertex2)
           @edges << Edge.new(vertex2, vertex1)
           vertex1 = vertex2
