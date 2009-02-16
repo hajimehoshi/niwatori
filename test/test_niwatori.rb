@@ -5,16 +5,15 @@ class TestNiwatori < MiniTest::Unit::TestCase
   include Niwatori
 
   def test_generate_graph
-    directions = [
-                  [:go_north],
-                  [:go_west],
-                  [:go_south],
-                  [:go_north],
-                  [:go_down],
-                  [:go_up],
-                  [:go_east],
-                  [:go_east],
-                  [:go_up],
+    directions = [:go_north,
+                  :go_west,
+                  :go_south,
+                  :go_north,
+                  :go_down,
+                  :go_up,
+                  :go_east,
+                  :go_east,
+                  :go_up,
                  ]
     digraph = Digraph.new(2, 5, 0, directions)
     e = digraph.edges.each
