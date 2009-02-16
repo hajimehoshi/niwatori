@@ -11,9 +11,9 @@ module Niwatori
     def initialize(x, y, z, directions)
       vertex1 = Vertex[x, y, z]
       @edges = []
-      directions.each do |d|
+      directions.each do |direction|
         vertex2 = vertex1.dup
-        case d[0]
+        case direction
         when :go_north
           vertex2.y -= 1
         when :go_west
