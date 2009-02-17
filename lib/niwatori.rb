@@ -1,66 +1,77 @@
 module Niwatori
 
-  Vertex = Struct.new(:x, :y, :z, :switch)
+  class DungeonPath
 
-  Edge = Struct.new(:initial, :terminal)
+    Node = Struct.new(:x, :y, :z, :switch)
 
-  class Digraph
+    class Node
+
+      def locate
+        [x, y, z]
+      end
+
+      def move(direction)
+        new_node = self.dup
+        case direction
+        when :north
+          new_node.y -= 1
+        when :west
+          new_node.x -= 1
+        when :east
+          new_node.x += 1
+        when :south
+          new_node.y += 1
+        when :up
+          new_node.z += 1
+        when :down
+          new_node.z -= 1
+        else
+          raise "invalid direction"
+        end
+        new_node
+      end
+
+    end
 
     attr_reader :start
     attr_reader :size
     attr_reader :floors
-    attr_reader :vertexes
-    attr_reader :edges
 
-    def width
-      size[0]
-    end
-
-    def height
-      size[1]
-    end
-
-    def initialize(directions, options)
+    def initialize(options)
       @start = options[:start]
       @size = options[:size]
       @floors = options[:floors]
-      @vertexes = [Vertex[*start, :state1]]
-      @edges = []
-      directions.each do |direction|
-        new_vertex = @vertexes.last.dup
-        case direction
-        when :go_north
-          new_vertex.y -= 1
-        when :go_west
-          new_vertex.x -= 1
-        when :go_east
-          new_vertex.x += 1
-        when :go_south
-          new_vertex.y += 1
-        when :go_down
-          new_vertex.z -= 1
-        when :go_up
-          new_vertex.z += 1
-        when :switch
-          new_vertex.switch = {
-            state1: :state2,
-            state2: :state1,
-          }[new_vertex.switch]
-        else
-          raise "invalid direction"
-        end
-        if 0 <= new_vertex.x and new_vertex.x < width and
-            0 <= new_vertex.y and new_vertex.y < height and
-            floors.include?(new_vertex.z) and
-            not vertexes.include?(new_vertex)
-          @edges << Edge.new(vertexes.last, new_vertex)
-          @edges << Edge.new(new_vertex, vertexes.last)
-          @vertexes << new_vertex
-        end
-      end
+      @nodes = [Node[*@start, :state1].freeze]
+    end
+
+    def width
+      @size[0]
+    end
+
+    def height
+      @size[1]
+    end
+
+    def nodes
+      @nodes.each
+    end
+
+    def addable?(direction)
+      new_node = @nodes.last.move(direction)
+      (0...width).include?(new_node.x) and
+        (0...height).include?(new_node.y) and
+        !@nodes.include?(new_node)
+    end
+
+    def add(direction)
+      raise "can't add" unless addable?(direction)
+      new_node = @nodes.last.move(direction)
+      @nodes << new_node.freeze
     end
 
   end
+
+=begin
 
   class Dungeon
 
@@ -125,5 +136,7 @@ module Niwatori
     end
 
   end
+
+=end
 
 end
