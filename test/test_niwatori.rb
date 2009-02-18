@@ -9,10 +9,6 @@ class TestNiwatori < MiniTest::Unit::TestCase
                                    size: [6, 6],
                                    floors: -6..5)
     assert_equal([2, 5, 0], dungeon_path.start)
-    assert_equal([6, 6], dungeon_path.size)
-    assert_equal(6, dungeon_path.width)
-    assert_equal(6, dungeon_path.height)
-    assert_equal(-6..5, dungeon_path.floors)
     expected_nodes = []
     expected_nodes << DungeonPath::Node[2, 5, 0, :state1]
     assert_equal(expected_nodes, dungeon_path.nodes.to_a)
@@ -63,10 +59,6 @@ class TestNiwatori < MiniTest::Unit::TestCase
     assert_equal(true, dungeon_path.addable?(:up))
     dungeon_path.add(:up)
     expected_nodes << DungeonPath::Node[3, 5, 1, :state1]
-    assert_equal(expected_nodes, dungeon_path.nodes.to_a)
-    # :south # conflict (by size)
-    assert_equal(false, dungeon_path.addable?(:south))
-    assert_raises(RuntimeError) { dungeon_path.add(:south) }
     assert_equal(expected_nodes, dungeon_path.nodes.to_a)
     # :down # conflict
     assert_equal(false, dungeon_path.addable?(:down))

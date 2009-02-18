@@ -34,13 +34,9 @@ module Niwatori
     end
 
     attr_reader :start
-    attr_reader :size
-    attr_reader :floors
 
     def initialize(options)
       @start = options[:start]
-      @size = options[:size]
-      @floors = options[:floors]
       @nodes = [Node[*@start, :state1].freeze]
     end
 
@@ -58,9 +54,7 @@ module Niwatori
 
     def addable?(direction)
       new_node = @nodes.last.move(direction)
-      (0...width).include?(new_node.x) and
-        (0...height).include?(new_node.y) and
-        !@nodes.include?(new_node)
+      !@nodes.include?(new_node)
     end
 
     def add(direction)
