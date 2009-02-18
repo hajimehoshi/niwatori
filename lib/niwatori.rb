@@ -6,10 +6,6 @@ module Niwatori
 
     class Node
 
-      def locate
-        [x, y, z]
-      end
-
       def move(direction)
         new_node = self.dup
         case direction
