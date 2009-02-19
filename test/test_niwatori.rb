@@ -2,6 +2,7 @@ require "niwatori"
 
 class TestNiwatori < MiniTest::Unit::TestCase
 
-  include Niwatori
+  def test_generate_rooms
+  end
 
 end

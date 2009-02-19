@@ -3,13 +3,14 @@ module Niwatori
   module_function
 
   def generate_dungeon()
-    generate_rooms(generate_path)
+    start = [0, 0, 0]
+    generate_rooms(generate_path(start), start)
   end
 
-  def generate_path
+  def generate_path(start)
     loop do
-      path = [[0, 0, 0, 0]]
-      until 50 <= path.size and
+      path = [[*start, 0]]
+      until 3 <= path.size and
           (last = path.last and
            path[1..-2].all? {|n| n[0..2] != path.last[0..2] })
         node = path.last.dup
@@ -21,7 +22,7 @@ module Niwatori
         next_nodes << node.dup.tap {|a| a[2] += 1 }
         next_nodes << node.dup.tap {|a| a[2] -= 1 }
         next_nodes << node.dup.tap {|a| a[3] = 1 - a[3] }
-        retry if next_nodes.all? {|n| path.include?(n) }
+        next if next_nodes.all? {|n| path.include?(n) }
         case i = rand(7)
         when 0..5
           node[i/2] += (i % 2) * 2 - 1
@@ -36,15 +37,15 @@ module Niwatori
     end
   end
 
-  def generate_rooms(path)
+  def generate_rooms(path, start)
     connections = {}
     size = {
-      :max_x => -1.0/0.0,
-      :min_x => 1.0/0.0,
-      :max_y => -1.0/0.0,
-      :min_y => 1.0/0.0,
-      :max_z => -1.0/0.0,
-      :min_z => 1.0/0.0,
+      :max_x => start[0],
+      :min_x => start[0],
+      :max_y => start[1],
+      :min_y => start[1],
+      :max_z => start[2],
+      :min_z => start[2],
     }
     path.each_with_index do |node, i|
       locate = node[0..2]
@@ -65,7 +66,7 @@ module Niwatori
         size[:max_z] = locate[2]
       end
       neighbor_nodes = []
-      neighbor_nodes << path[i-1] if 0 < i-1
+      neighbor_nodes << path[i-1] if 0 <= i-1
       neighbor_nodes << path[i+1] if path[i+1]
       cs = []
       neighbor_nodes.each do |n|
@@ -87,7 +88,7 @@ module Niwatori
       end
       connections[locate][node[3]] = cs if 0 < cs.size
     end
-    rooms = Rooms.new(connections, size, [0, 0, 0], path.last[0..2])
+    rooms = Rooms.new(connections, size, start, path.last[0..2])
   end
 
   class Rooms
