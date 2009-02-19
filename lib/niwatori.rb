@@ -21,19 +21,18 @@ module Niwatori
           new_node.z += 1
         when :down
           new_node.z -= 1
+        when :switch
+          new_node.switch = 1 - new_node.switch
         else
-          raise "invalid direction"
+          raise "invalid direction: #{direction}"
         end
         new_node
       end
 
     end
 
-    attr_reader :start
-
-    def initialize(options)
-      @start = options[:start]
-      @nodes = [Node[*@start, :state1].freeze]
+    def initialize
+      @nodes = [Node[0, 0, 0, 0].freeze]
     end
 
     def width
