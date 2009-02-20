@@ -35,7 +35,8 @@ module Niwatori
       node = path.last.dup
       next_nodes = get_next_nodes(node)
       next_nodes.reject! {|n| all_nodes.include?(n) }
-      raise "retry" if next_nodes.empty?
+      break if next_nodes.empty?
+      # raise "retry" if next_nodes.empty?
       priority_nodes = next_nodes.dup
       priority_nodes.reject! {|n| n[0..2] == node[0..2]}
       priority_nodes.reject! {|n| !all_nodes.include?([*n[0..2], 1 - n[3]]) }
