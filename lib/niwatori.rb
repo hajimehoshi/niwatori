@@ -10,8 +10,8 @@ module Niwatori
   end
 
   def generate_paths(start, paths, keys)
-    2.times do
-      add_path(paths, start, 10)
+    200.times do
+      add_path(paths, start, 3)
       start = paths.last.sample
     end
   end
@@ -30,13 +30,12 @@ module Niwatori
 
   def add_path(paths, start, length)
     paths << (path = [[*start, 0]])
+    all_nodes = paths.flatten(1)
     loop do
-      all_nodes = paths.flatten(1)
       node = path.last.dup
       next_nodes = get_next_nodes(node)
       next_nodes.reject! {|n| all_nodes.include?(n) }
       break if next_nodes.empty?
-      # raise "retry" if next_nodes.empty?
       priority_nodes = next_nodes.dup
       priority_nodes.reject! {|n| n[0..2] == node[0..2]}
       priority_nodes.reject! {|n| !all_nodes.include?([*n[0..2], 1 - n[3]]) }
@@ -48,7 +47,14 @@ module Niwatori
         end
       ensure
         path.push(node)
+        all_nodes.push(node)
       end
+    end
+    if path.size == 1
+      paths.pop
+      false
+    else
+      true
     end
   end
 
