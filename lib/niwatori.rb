@@ -178,7 +178,6 @@ X: Big key door
                   new_lines[1][z%2 == 0 ? 8 : 4] = "v"
                 end
               end
-              p [x, y, z, room]
               if !room[0].empty? and !room[1].empty?
                 [["r", 0, 1], ["B", 1, 0]].each do |color, i1, i2|
                   (room[i1] - room[i2]).each do |door|
