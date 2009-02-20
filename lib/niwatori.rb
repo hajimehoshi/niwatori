@@ -8,33 +8,39 @@ module Niwatori
   end
 
   def generate_path(start)
+    size = 10
+    path = [[*start, 0]]
     loop do
-      path = [[*start, 0]]
-      until 3 <= path.size and
-          (last = path.last and
-           path[1..-2].all? {|n| n[0..2] != path.last[0..2] })
-        node = path.last.dup
-        next_nodes = []
-        next_nodes << node.dup.tap {|a| a[0] += 1 }
-        next_nodes << node.dup.tap {|a| a[0] -= 1 }
-        next_nodes << node.dup.tap {|a| a[1] += 1 }
-        next_nodes << node.dup.tap {|a| a[1] -= 1 }
-        next_nodes << node.dup.tap {|a| a[2] += 1 }
-        next_nodes << node.dup.tap {|a| a[2] -= 1 }
-        next_nodes << node.dup.tap {|a| a[3] = 1 - a[3] }
-        next if next_nodes.all? {|n| path.include?(n) }
-        case i = rand(7)
-        when 0..5
-          node[i/2] += (i % 2) * 2 - 1
-        when 6
-          node[3] = 1 - node[3]
-        end
-        unless path.include?(node)
+      node = path.last.dup
+      next_nodes = []
+      next_nodes << node.dup.tap {|a| a[0] += 1 }
+      next_nodes << node.dup.tap {|a| a[0] -= 1 }
+      next_nodes << node.dup.tap {|a| a[1] += 1 }
+      next_nodes << node.dup.tap {|a| a[1] -= 1 }
+      next_nodes << node.dup.tap {|a| a[2] += 1 }
+      next_nodes << node.dup.tap {|a| a[2] -= 1 }
+      next_nodes << node.dup.tap {|a| a[3] = 1 - a[3] }
+      if next_nodes.all? {|n| path.include?(n) }
+        return generate_path(start)
+      end
+      case i = rand(7)
+      when 0..5
+        node[i/2] += (i % 2) * 2 - 1
+      when 6
+        node[3] = 1 - node[3]
+      end
+      unless path.include?(node)
+        begin
+          if size <= path.size + 1 and
+              path.all? {|n| n[0..2] != node[0..2] }
+            break
+          end
+        ensure
           path.push(node)
         end
       end
-      return path
     end
+    path
   end
 
   def generate_rooms(path, start)
@@ -49,7 +55,9 @@ module Niwatori
     }
     path.each_with_index do |node, i|
       locate = node[0..2]
-      connections[locate] ||= {}
+      connections[locate] ||= {
+        0 => [], 1 => [],
+      }
       if locate[0] < size[:min_x]
         size[:min_x] = locate[0]
       elsif size[:max_x] < locate[0]
@@ -68,7 +76,7 @@ module Niwatori
       neighbor_nodes = []
       neighbor_nodes << path[i-1] if 0 <= i-1
       neighbor_nodes << path[i+1] if path[i+1]
-      cs = []
+      cs = connections[locate][node[3]]
       neighbor_nodes.each do |n|
         if node[0] - 1 == n[0]
           cs << :west
@@ -86,7 +94,6 @@ module Niwatori
           connections[locate][:switch] = true
         end
       end
-      connections[locate][node[3]] = cs if 0 < cs.size
     end
     rooms = Rooms.new(connections, size, start, path.last[0..2])
   end
@@ -155,7 +162,7 @@ X: Big key door
               if room[:switch]
                 new_lines[3][6] = "*"
               end
-              ((room[0] || []) | (room[1] || [])).each do |door|
+              (room[0] | room[1]).each do |door|
                 case door
                 when :north
                   new_lines[0][6] = "|"
@@ -171,7 +178,8 @@ X: Big key door
                   new_lines[1][z%2 == 0 ? 8 : 4] = "v"
                 end
               end
-              if room[0] and room[1]
+              p [x, y, z, room]
+              if !room[0].empty? and !room[1].empty?
                 [["r", 0, 1], ["B", 1, 0]].each do |color, i1, i2|
                   (room[i1] - room[i2]).each do |door|
                     case door
