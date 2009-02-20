@@ -3,99 +3,109 @@ module Niwatori
   module_function
 
   def generate_dungeon()
-    start = [0, 0, 0]
-    generate_rooms(generate_path(start), start)
+    paths = []
+    keys = []
+    generate_paths([0, 0, 0], paths, keys)
+    generate_rooms(paths, keys)
   end
 
-  def generate_path(start)
-    size = 10
-    path = [[*start, 0]]
+  def generate_paths(start, paths, keys)
+    2.times do
+      add_path(paths, start, 10)
+      start = paths.last.sample
+    end
+  end
+
+  def get_next_nodes(node)
+    next_nodes = []
+    next_nodes << node.dup.tap {|n| n[0] += 1 } if node[0] + 1 <= 6
+    next_nodes << node.dup.tap {|n| n[0] -= 1 } if -6 <= node[0] - 1
+    next_nodes << node.dup.tap {|n| n[1] += 1 } if node[1] + 1 <= 6
+    next_nodes << node.dup.tap {|n| n[1] -= 1 } if -6 <= node[1] - 1
+    next_nodes << node.dup.tap {|n| n[2] += 1 } if node[2] + 1 <= 6
+    next_nodes << node.dup.tap {|n| n[2] -= 1 } if -6 <= node[2] - 1
+    next_nodes << node.dup.tap {|n| n[3] = 1 - n[3] }
+    next_nodes
+  end 
+
+  def add_path(paths, start, length)
+    paths << (path = [[*start, 0]])
     loop do
+      all_nodes = paths.flatten(1)
       node = path.last.dup
-      next_nodes = []
-      next_nodes << node.dup.tap {|a| a[0] += 1 }
-      next_nodes << node.dup.tap {|a| a[0] -= 1 }
-      next_nodes << node.dup.tap {|a| a[1] += 1 }
-      next_nodes << node.dup.tap {|a| a[1] -= 1 }
-      next_nodes << node.dup.tap {|a| a[2] += 1 }
-      next_nodes << node.dup.tap {|a| a[2] -= 1 }
-      next_nodes << node.dup.tap {|a| a[3] = 1 - a[3] }
-      if next_nodes.all? {|n| path.include?(n) }
-        return generate_path(start)
-      end
-      case i = rand(7)
-      when 0..5
-        node[i/2] += (i % 2) * 2 - 1
-      when 6
-        node[3] = 1 - node[3]
-      end
-      unless path.include?(node)
-        begin
-          if size <= path.size + 1 and
-              path.all? {|n| n[0..2] != node[0..2] }
-            break
-          end
-        ensure
-          path.push(node)
+      next_nodes = get_next_nodes(node)
+      next_nodes.reject! {|n| all_nodes.include?(n) }
+      raise "retry" if next_nodes.empty?
+      priority_nodes = next_nodes.dup
+      priority_nodes.reject! {|n| n[0..2] == node[0..2]}
+      priority_nodes.reject! {|n| !all_nodes.include?([*n[0..2], 1 - n[3]]) }
+      node = (next_nodes + priority_nodes * 20).sample
+      begin
+        if length <= path.size + 1 and
+            all_nodes.all? {|n| n[0..2] != node[0..2] }
+          break
         end
+      ensure
+        path.push(node)
       end
     end
-    path
   end
 
-  def generate_rooms(path, start)
+  def generate_rooms(paths, keys)
     connections = {}
     size = {
-      :max_x => start[0],
-      :min_x => start[0],
-      :max_y => start[1],
-      :min_y => start[1],
-      :max_z => start[2],
-      :min_z => start[2],
+      :max_x => paths[0][0][0],
+      :min_x => paths[0][0][0],
+      :max_y => paths[0][0][1],
+      :min_y => paths[0][0][1],
+      :max_z => paths[0][0][2],
+      :min_z => paths[0][0][2],
     }
-    path.each_with_index do |node, i|
-      locate = node[0..2]
-      connections[locate] ||= {
-        0 => [], 1 => [],
-      }
-      if locate[0] < size[:min_x]
-        size[:min_x] = locate[0]
-      elsif size[:max_x] < locate[0]
-        size[:max_x] = locate[0]
-      end
-      if locate[1] < size[:min_y]
-        size[:min_y] = locate[1]
-      elsif size[:max_y] < locate[1]
-        size[:max_y] = locate[1]
-      end
-      if locate[2] < size[:min_z]
-        size[:min_z] = locate[2]
-      elsif size[:max_z] < locate[2]
-        size[:max_z] = locate[2]
-      end
-      neighbor_nodes = []
-      neighbor_nodes << path[i-1] if 0 <= i-1
-      neighbor_nodes << path[i+1] if path[i+1]
-      cs = connections[locate][node[3]]
-      neighbor_nodes.each do |n|
-        if node[0] - 1 == n[0]
-          cs << :west
-        elsif node[0] + 1 == n[0]
-          cs << :east
-        elsif node[1] - 1 == n[1]
-          cs << :north
-        elsif node[1] + 1 == n[1]
-          cs << :south
-        elsif node[2] - 1 == n[2]
-          cs << :down
-        elsif node[2] + 1 == n[2]
-          cs << :up
-        elsif node[3] != n[3]
-          connections[locate][:switch] = true
+    paths.each do |path|
+      path.each_with_index do |node, i|
+        locate = node[0..2]
+        connections[locate] ||= {
+          0 => [], 1 => [],
+        }
+        if locate[0] < size[:min_x]
+          size[:min_x] = locate[0]
+        elsif size[:max_x] < locate[0]
+          size[:max_x] = locate[0]
+        end
+        if locate[1] < size[:min_y]
+          size[:min_y] = locate[1]
+        elsif size[:max_y] < locate[1]
+          size[:max_y] = locate[1]
+        end
+        if locate[2] < size[:min_z]
+          size[:min_z] = locate[2]
+        elsif size[:max_z] < locate[2]
+          size[:max_z] = locate[2]
+        end
+        neighbor_nodes = []
+        neighbor_nodes << path[i-1] if 0 <= i-1
+        neighbor_nodes << path[i+1] if path[i+1]
+        cs = connections[locate][node[3]]
+        neighbor_nodes.each do |n|
+          if node[0] - 1 == n[0]
+            cs << :west
+          elsif node[0] + 1 == n[0]
+            cs << :east
+          elsif node[1] - 1 == n[1]
+            cs << :north
+          elsif node[1] + 1 == n[1]
+            cs << :south
+          elsif node[2] - 1 == n[2]
+            cs << :down
+          elsif node[2] + 1 == n[2]
+            cs << :up
+          elsif node[3] != n[3]
+            connections[locate][:switch] = true
+          end
         end
       end
     end
-    rooms = Rooms.new(connections, size, start, path.last[0..2])
+    return Rooms.new(connections, size, paths[0][0][0..2], paths[-1][-1][0..2])
   end
 
   class Rooms
@@ -131,6 +141,8 @@ B: Blue block
 
 k: Small key
 K: Big key
+[]: Big tresure box
+
 u: Upper stair
 d: Downer stair
 
@@ -140,19 +152,20 @@ X: Big key door
 =end
     def to_aa
       lines = []
+      min_x, min_y = @size[:min_x], @size[:min_y]
       (@size[:min_z]..@size[:max_z]).reverse_each do |z|
         lines << ((0 <= z) ? "#{z+1}F" : "B#{-z}F")
         (@size[:min_y]..@size[:max_y]).each do |y|
           7.times { lines << "" }
           (@size[:min_x]..@size[:max_x]).each do |x|
             if room = @connections[[x, y, z]]
-              new_lines = ["             ",
+              new_lines = ["  %3d   %3d  " % [x - min_x, y - min_y],
                            "  +-------+  ",
                            "  |       |  ",
                            "  |       |  ",
                            "  |       |  ",
                            "  +-------+  ",
-                           "             "]
+                           "             ",]
               if [x, y, z] == @start
                 new_lines[4][3] = "S"
               end
