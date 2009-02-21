@@ -42,9 +42,9 @@ module Niwatori
       next_nodes.reject! {|n| all_nodes_flag[n] }
       break if next_nodes.empty?
       priority_nodes = next_nodes.dup
-      priority_nodes.reject! {|n| n[0..2] == node[0..2]}
+      priority_nodes.reject! {|n| n[3] == 1 - node[3] }
       priority_nodes.reject! {|n| !all_nodes_flag[[*n[0..2], 1 - n[3]]] }
-      node = (next_nodes + priority_nodes * 10).sample
+      node = (next_nodes + priority_nodes * 4).sample
       begin
         if length <= path.size + 1 and
             !all_nodes_flag[[node[0..2], 1 - node[3]]]
