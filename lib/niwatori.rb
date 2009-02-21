@@ -112,7 +112,6 @@ module Niwatori
         end
       end
     end
-    p connections
     return Rooms.new(connections, size, paths[0][0][0..2], paths[-1][-1][0..2])
   end
 
