@@ -47,11 +47,11 @@ module Niwatori
       node = (next_nodes + priority_nodes * 4).sample
       begin
         if length <= path.size + 1 and
-            !all_nodes_flag[[node[0..2], 1 - node[3]]]
+            !all_nodes_flag[[*node[0..2], 1 - node[3]]]
           break
         end
       ensure
-        path.push(node)
+        path << node
         all_nodes_flag[node] = true
       end
     end
