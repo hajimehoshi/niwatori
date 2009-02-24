@@ -1,18 +1,86 @@
 module Niwatori
 
+  class Paths
+
+    def initialize
+      @paths = []
+      @node_flags = {}
+    end
+
+    def add_path
+      @paths << []
+    end
+
+    def remove_path
+      raise "can't remove" unless @paths.last.size <= 1
+      @paths.pop
+    end
+
+    def first_node
+      @paths.first.first
+    end
+
+    def last_node
+      @paths.last.last
+    end
+
+    def last_path
+      @paths.last
+    end
+
+    def add_node(node)
+      @paths.last << node
+      @node_flags[node] = true
+    end
+
+    def include?(node)
+      @node_flags[node]
+    end
+
+    def positions
+      positions = []
+      @paths.each do |path|
+        path.each do |node|
+          positions << node[0..2]
+        end
+      end
+      positions.uniq
+    end
+
+    include Enumerable
+
+    def each
+      @paths.each do |path|
+        yield(path)
+      end
+    end
+
+  end
+
   module_function
 
   def generate_dungeon()
-    paths = []
+    paths = Paths.new
     keys = []
     generate_paths([0, 0, 0], paths, keys)
     generate_rooms(paths, keys)
   end
 
   def generate_paths(start, paths, keys)
-    400.times do
-      add_path(paths, start, 10)
-      start = paths.last.sample[0..2]
+    length = -> { 8 + rand(5) }
+    add_path(paths, start, length.())
+    4.times do |i|
+#      p i
+      key_nodes = (paths.positions - keys).sample(rand(2))
+      key_count = key_nodes.size
+      keys.push(*key_nodes)
+      begin
+        r = add_path(paths, paths.last_path.sample[0..2], length.())
+      end until r
+      # p keys
+      #i = 0
+      #while i < key_count
+      #end
     end
   end
 
@@ -29,34 +97,29 @@ module Niwatori
   end 
 
   def add_path(paths, start, length)
-    paths << (path = [[*start, 0]])
-    all_nodes_flag = {}
-    paths.each do |path|
-      path.each do |node|
-        all_nodes_flag[node] = true
-      end
-    end
+    paths.add_path
+    paths.add_node([*start, 0])
     loop do
-      node = path.last.dup
+      node = paths.last_node.dup
       next_nodes = get_next_nodes(node)
-      next_nodes.reject! {|n| all_nodes_flag[n] }
+      next_nodes.reject! {|n| paths.include?(n) }
       break if next_nodes.empty?
-      priority_nodes = next_nodes.dup
-      priority_nodes.reject! {|n| n[3] == 1 - node[3] }
-      priority_nodes.reject! {|n| !all_nodes_flag[[*n[0..2], 1 - n[3]]] }
-      node = (next_nodes + priority_nodes * 4).sample
+      # priority_nodes = next_nodes.dup
+      # priority_nodes.reject! {|n| n[3] == 1 - node[3] }
+      # priority_nodes.reject! {|n| !paths.include?([*n[0..2], 1 - n[3]]) }
+      # node = (next_nodes + priority_nodes * 4).sample
+      node = next_nodes.sample
       begin
-        if length <= path.size + 1 and
-            !all_nodes_flag[[*node[0..2], 1 - node[3]]]
+        if length <= paths.last_path.size + 1 and
+            !paths.include?([*node[0..2], 1 - node[3]])
           break
         end
       ensure
-        path << node
-        all_nodes_flag[node] = true
+        paths.add_node(node)
       end
     end
-    if path.size == 1
-      paths.pop
+    if paths.last_path.size == 1
+      paths.remove_path
       false
     else
       true
@@ -66,38 +129,38 @@ module Niwatori
   def generate_rooms(paths, keys)
     connections = {}
     size = {
-      :max_x => paths[0][0][0],
-      :min_x => paths[0][0][0],
-      :max_y => paths[0][0][1],
-      :min_y => paths[0][0][1],
-      :max_z => paths[0][0][2],
-      :min_z => paths[0][0][2],
+      :max_x => paths.first_node[0],
+      :min_x => paths.first_node[0],
+      :max_y => paths.first_node[1],
+      :min_y => paths.first_node[1],
+      :max_z => paths.first_node[2],
+      :min_z => paths.first_node[2],
     }
     paths.each do |path|
       path.each_with_index do |node, i|
-        locate = node[0..2]
-        connections[locate] ||= {
+        position = node[0..2]
+        connections[position] ||= {
           0 => [], 1 => [],
         }
-        if locate[0] < size[:min_x]
-          size[:min_x] = locate[0]
-        elsif size[:max_x] < locate[0]
-          size[:max_x] = locate[0]
+        if position[0] < size[:min_x]
+          size[:min_x] = position[0]
+        elsif size[:max_x] < position[0]
+          size[:max_x] = position[0]
         end
-        if locate[1] < size[:min_y]
-          size[:min_y] = locate[1]
-        elsif size[:max_y] < locate[1]
-          size[:max_y] = locate[1]
+        if position[1] < size[:min_y]
+          size[:min_y] = position[1]
+        elsif size[:max_y] < position[1]
+          size[:max_y] = position[1]
         end
-        if locate[2] < size[:min_z]
-          size[:min_z] = locate[2]
-        elsif size[:max_z] < locate[2]
-          size[:max_z] = locate[2]
+        if position[2] < size[:min_z]
+          size[:min_z] = position[2]
+        elsif size[:max_z] < position[2]
+          size[:max_z] = position[2]
         end
         neighbor_nodes = []
         neighbor_nodes << path[i-1] if 0 <= i-1
         neighbor_nodes << path[i+1] if path[i+1]
-        cs = connections[locate][node[3]]
+        cs = connections[position][node[3]]
         neighbor_nodes.each do |n|
           if node[0] - 1 == n[0]
             cs << :west
@@ -112,12 +175,15 @@ module Niwatori
           elsif node[2] + 1 == n[2]
             cs << :up
           elsif node[3] != n[3]
-            connections[locate][:switch] = true
+            connections[position][:switch] = true
           end
         end
       end
     end
-    return Rooms.new(connections, size, paths[0][0][0..2], paths[-1][-1][0..2])
+    keys.each do |position|
+      connections[position][:key] = true
+    end
+    return Rooms.new(connections, size, paths.first_node[0..2], paths.last_node[0..2])
   end
 
   class Rooms
@@ -139,7 +205,7 @@ module Niwatori
     ^
     |
 +-------+
-|       |
+|       |p
 |       |
 |G      |
 +-------+
@@ -186,6 +252,9 @@ X: Big key door
               end
               if room[:switch]
                 new_lines[3][6] = "*"
+              end
+              if room[:key]
+                new_lines[3][5] = "k"
               end
               (room[0] | room[1]).each do |door|
                 case door
