@@ -2,55 +2,58 @@ module Niwatori
 
   class Paths
 
-    def initialize
-      @paths = []
+    def initialize(start)
+      @branches = [[[*start, 0]]]
       @node_flags = {}
+      @position_flags = {}
     end
 
-    def add_path
-      @paths << []
+    def add_branch(branch_index, node_index)
+      @branches << [@branches[branch_index][node_index]]
     end
 
-    def remove_path
-      raise "can't remove" unless @paths.last.size <= 1
-      @paths.pop
+    def branches
+      @branches
+    end
+
+    def remove_branch
+      raise "can't remove" unless @branches.last.size <= 1
+      @branches.pop
     end
 
     def first_node
-      @paths.first.first
+      @branches.first.first
     end
 
     def last_node
-      @paths.last.last
+      @branches.last.last
     end
 
-    def last_path
-      @paths.last
+    def last_branch
+      @branches.last
     end
 
     def add_node(node)
-      @paths.last << node
+      raise "invalid node" if node.size != 4
+      @branches.last << node
       @node_flags[node] = true
+      @position_flags[node[0..2]] = true
     end
 
     def include?(node)
       @node_flags[node]
     end
 
-    def positions
-      positions = []
-      @paths.each do |path|
-        path.each do |node|
-          positions << node[0..2]
-        end
-      end
-      positions.uniq
+    def nodes
+      @node_flags.keys
     end
 
-    include Enumerable
+    def positions
+      @position_flags.keys
+    end
 
-    def each
-      @paths.each do |path|
+    def each_branch
+      @branches.each do |path|
         yield(path)
       end
     end
@@ -60,28 +63,58 @@ module Niwatori
   module_function
 
   def generate_dungeon()
-    paths = Paths.new
+    paths = Paths.new([0, 0, 0])
     keys = []
-    generate_paths([0, 0, 0], paths, keys)
+    generate_paths(paths, keys)
     generate_rooms(paths, keys)
   end
 
-  def generate_paths(start, paths, keys)
-    length = -> { 8 + rand(5) }
-    add_path(paths, start, length.())
-    4.times do |i|
-#      p i
-      key_nodes = (paths.positions - keys).sample(rand(2))
-      key_count = key_nodes.size
-      keys.push(*key_nodes)
+  def generate_paths(paths, keys)
+    length = -> { 6 + rand(5) }
+    add_branch = ->(branch_index, path_index, length) {
+      paths.add_branch(branch_index, path_index)
+      loop do
+        node = paths.last_node.dup
+        next_nodes = get_next_nodes(node)
+        next_nodes.reject! {|n| paths.include?(n) }
+        break if next_nodes.empty?
+        node = next_nodes.sample
+        paths.add_node(node)
+        break if length <= paths.last_branch.size and
+          !paths.include?([*node[0..2], 1 - node[3]])
+      end
+      if paths.last_branch.size == 1
+        paths.remove_branch
+        false
+      else
+        true
+      end
+    }
+    add_branch.(0, 0, length.())
+    600.times do |i|
       begin
-        r = add_path(paths, paths.last_path.sample[0..2], length.())
+        branches = paths.branches
+        branch_index = rand(branches.size)
+        node_index = rand(branches[branch_index].size)
+        r = add_branch.(branch_index, node_index, length.())
+      end until r
+    end
+=begin
+    600.times do |i|
+      # $stderr.puts(i)
+      # key_nodes = (paths.positions - keys).sample(rand(2))
+      # key_count = key_nodes.size
+      # keys.push(*key_nodes)
+      begin
+        # r = add_path(paths, paths.last_path.sample[0..2], length.())
+        r = add_path(paths, paths.nodes.sample, length.())
       end until r
       # p keys
       #i = 0
       #while i < key_count
       #end
     end
+=end
   end
 
   def get_next_nodes(node)
@@ -96,36 +129,6 @@ module Niwatori
     next_nodes
   end 
 
-  def add_path(paths, start, length)
-    paths.add_path
-    paths.add_node([*start, 0])
-    loop do
-      node = paths.last_node.dup
-      next_nodes = get_next_nodes(node)
-      next_nodes.reject! {|n| paths.include?(n) }
-      break if next_nodes.empty?
-      # priority_nodes = next_nodes.dup
-      # priority_nodes.reject! {|n| n[3] == 1 - node[3] }
-      # priority_nodes.reject! {|n| !paths.include?([*n[0..2], 1 - n[3]]) }
-      # node = (next_nodes + priority_nodes * 4).sample
-      node = next_nodes.sample
-      begin
-        if length <= paths.last_path.size + 1 and
-            !paths.include?([*node[0..2], 1 - node[3]])
-          break
-        end
-      ensure
-        paths.add_node(node)
-      end
-    end
-    if paths.last_path.size == 1
-      paths.remove_path
-      false
-    else
-      true
-    end
-  end
-
   def generate_rooms(paths, keys)
     connections = {}
     size = {
@@ -136,8 +139,8 @@ module Niwatori
       :max_z => paths.first_node[2],
       :min_z => paths.first_node[2],
     }
-    paths.each do |path|
-      path.each_with_index do |node, i|
+    paths.each_branch do |branch|
+      branch.each_with_index do |node, i|
         position = node[0..2]
         connections[position] ||= {
           0 => [], 1 => [],
@@ -158,8 +161,8 @@ module Niwatori
           size[:max_z] = position[2]
         end
         neighbor_nodes = []
-        neighbor_nodes << path[i-1] if 0 <= i-1
-        neighbor_nodes << path[i+1] if path[i+1]
+        neighbor_nodes << branch[i-1] if 0 <= i-1
+        neighbor_nodes << branch[i+1] if branch[i+1]
         cs = connections[position][node[3]]
         neighbor_nodes.each do |n|
           if node[0] - 1 == n[0]
