@@ -8,23 +8,49 @@ module Niwatori
         @nodes = [node]
         @parent = parent
       end
+      
+      def initialize(parent = nil, node_index = 0)
+        @parent = parent
+        if parent
+          @nodes = [parent.nodes[node_index]]
+        else
+          @nodes = []
+        end
+      end
 
       def nodes
         @nodes
       end
 
+      def parent
+        @parent
+      end
+
+      def level
+        unless @level
+          @level = 0
+          branch = self.parent
+          while branch
+            @level += 1
+            branch = branch.parent
+          end
+        end
+        @level
+      end
+
     end
 
     def initialize(start)
-      @branches = [Branch.new([*start, 0], nil)]
+      branch = Branch.new
+      branch.nodes << [*start, 0]
+      @branches = [branch]
       @node_flags = {}
       @position_flags = {}
     end
 
     def add_branch(branch_index, node_index)
       parent_branch = @branches[branch_index]
-      node = parent_branch.nodes[node_index]
-      @branches << Branch.new(node, parent_branch)
+      @branches << Branch.new(parent_branch, node_index)
     end
 
     def branches
@@ -67,12 +93,6 @@ module Niwatori
       @position_flags.keys
     end
 
-    def each_branch
-      @branches.each do |branch|
-        yield(branch)
-      end
-    end
-
   end
 
   module_function
@@ -86,11 +106,22 @@ module Niwatori
 
   def generate_paths(paths, keys)
     length = -> { 6 + rand(5) }
+    get_next_nodes = ->(node) {
+      next_nodes = []
+      next_nodes << node.dup.tap {|n| n[0] += 1 } if node[0] + 1 <= 6
+      next_nodes << node.dup.tap {|n| n[0] -= 1 } if -6 <= node[0] - 1
+      next_nodes << node.dup.tap {|n| n[1] += 1 } if node[1] + 1 <= 6
+      next_nodes << node.dup.tap {|n| n[1] -= 1 } if -6 <= node[1] - 1
+      next_nodes << node.dup.tap {|n| n[2] += 1 } if node[2] + 1 <= 6
+      next_nodes << node.dup.tap {|n| n[2] -= 1 } if -6 <= node[2] - 1
+      next_nodes << node.dup.tap {|n| n[3] = 1 - n[3] }
+      next_nodes
+    }
     add_branch = ->(branch_index, path_index, length) {
       paths.add_branch(branch_index, path_index)
       loop do
         node = paths.last_node.dup
-        next_nodes = get_next_nodes(node)
+        next_nodes = get_next_nodes.(node)
         next_nodes.reject! {|n| paths.include?(n) }
         break if next_nodes.empty?
         node = next_nodes.sample
@@ -132,18 +163,6 @@ module Niwatori
 =end
   end
 
-  def get_next_nodes(node)
-    next_nodes = []
-    next_nodes << node.dup.tap {|n| n[0] += 1 } if node[0] + 1 <= 6
-    next_nodes << node.dup.tap {|n| n[0] -= 1 } if -6 <= node[0] - 1
-    next_nodes << node.dup.tap {|n| n[1] += 1 } if node[1] + 1 <= 6
-    next_nodes << node.dup.tap {|n| n[1] -= 1 } if -6 <= node[1] - 1
-    next_nodes << node.dup.tap {|n| n[2] += 1 } if node[2] + 1 <= 6
-    next_nodes << node.dup.tap {|n| n[2] -= 1 } if -6 <= node[2] - 1
-    next_nodes << node.dup.tap {|n| n[3] = 1 - n[3] }
-    next_nodes
-  end 
-
   def generate_rooms(paths, keys)
     connections = {}
     size = {
@@ -154,7 +173,7 @@ module Niwatori
       :max_z => paths.first_node[2],
       :min_z => paths.first_node[2],
     }
-    paths.each_branch do |branch|
+    paths.branches.each do |branch|
       (nodes = branch.nodes).each_with_index do |node, i|
         position = node[0..2]
         connections[position] ||= {
@@ -201,7 +220,8 @@ module Niwatori
     keys.each do |position|
       connections[position][:key] = true
     end
-    return Rooms.new(connections, size, paths.first_node[0..2], paths.last_node[0..2])
+    goal = paths.branches.max {|a, b| a.level - b.level }.nodes.last
+    return Rooms.new(connections, size, paths.first_node[0..2], goal)
   end
 
   class Rooms
