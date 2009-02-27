@@ -2,14 +2,27 @@ module Niwatori
 
   class Paths
 
+    class Branch
+
+      def initialize(node)
+        @nodes = [node]
+      end
+
+      def nodes
+        @nodes
+      end
+
+    end
+
     def initialize(start)
-      @branches = [[[*start, 0]]]
+      @branches = [Branch.new([*start, 0])]
       @node_flags = {}
       @position_flags = {}
     end
 
     def add_branch(branch_index, node_index)
-      @branches << [@branches[branch_index][node_index]]
+      node = @branches[branch_index].nodes[node_index]
+      @branches << Branch.new(node)
     end
 
     def branches
@@ -22,11 +35,11 @@ module Niwatori
     end
 
     def first_node
-      @branches.first.first
+      @branches.first.nodes.first
     end
 
     def last_node
-      @branches.last.last
+      @branches.last.nodes.last
     end
 
     def last_branch
@@ -35,7 +48,7 @@ module Niwatori
 
     def add_node(node)
       raise "invalid node" if node.size != 4
-      @branches.last << node
+      @branches.last.nodes << node
       @node_flags[node] = true
       @position_flags[node[0..2]] = true
     end
@@ -53,8 +66,8 @@ module Niwatori
     end
 
     def each_branch
-      @branches.each do |path|
-        yield(path)
+      @branches.each do |branch|
+        yield(branch)
       end
     end
 
@@ -80,10 +93,10 @@ module Niwatori
         break if next_nodes.empty?
         node = next_nodes.sample
         paths.add_node(node)
-        break if length <= paths.last_branch.size and
+        break if length <= paths.last_branch.nodes.size and
           !paths.include?([*node[0..2], 1 - node[3]])
       end
-      if paths.last_branch.size == 1
+      if paths.last_branch.nodes.size == 1
         paths.remove_branch
         false
       else
@@ -91,11 +104,11 @@ module Niwatori
       end
     }
     add_branch.(0, 0, length.())
-    600.times do |i|
+    6.times do |i|
       begin
         branches = paths.branches
         branch_index = rand(branches.size)
-        node_index = rand(branches[branch_index].size)
+        node_index = rand(branches[branch_index].nodes.size)
         r = add_branch.(branch_index, node_index, length.())
       end until r
     end
@@ -140,7 +153,7 @@ module Niwatori
       :min_z => paths.first_node[2],
     }
     paths.each_branch do |branch|
-      branch.each_with_index do |node, i|
+      (nodes = branch.nodes).each_with_index do |node, i|
         position = node[0..2]
         connections[position] ||= {
           0 => [], 1 => [],
@@ -161,8 +174,8 @@ module Niwatori
           size[:max_z] = position[2]
         end
         neighbor_nodes = []
-        neighbor_nodes << branch[i-1] if 0 <= i-1
-        neighbor_nodes << branch[i+1] if branch[i+1]
+        neighbor_nodes << nodes[i-1] if 0 <= i-1
+        neighbor_nodes << nodes[i+1] if nodes[i+1]
         cs = connections[position][node[3]]
         neighbor_nodes.each do |n|
           if node[0] - 1 == n[0]
