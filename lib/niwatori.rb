@@ -50,7 +50,9 @@ module Niwatori
 
     def add_branch(branch_index, node_index)
       parent_branch = @branches[branch_index]
-      @branches << Branch.new(parent_branch, node_index)
+      branch = Branch.new(parent_branch, node_index)
+      @branches << branch
+      branch
     end
 
     def branches
@@ -58,20 +60,16 @@ module Niwatori
     end
 
     def remove_branch
-      raise "can't remove" unless @branches.last.size <= 1
+      raise "can't remove" unless @branches.last.nodes.size <= 1
       @branches.pop
     end
 
-    def first_node
+    def start_node
       @branches.first.nodes.first
     end
 
     def last_node
       @branches.last.nodes.last
-    end
-
-    def last_branch
-      @branches.last
     end
 
     def add_node(node)
@@ -117,34 +115,49 @@ module Niwatori
       next_nodes << node.dup.tap {|n| n[3] = 1 - n[3] }
       next_nodes
     }
-    add_branch = ->(branch_index, path_index, length) {
+    add_branch = ->(branch_index, path_index, length, with_goal) {
       paths.add_branch(branch_index, path_index)
       loop do
         node = paths.last_node.dup
         next_nodes = get_next_nodes.(node)
         next_nodes.reject! {|n| paths.include?(n) }
-        break if next_nodes.empty?
+        if next_nodes.empty?
+          #if with_goal
+          #  return false
+          #else
+            break
+          #end
+        end
         node = next_nodes.sample
         paths.add_node(node)
-        break if length <= paths.last_branch.nodes.size and
-          !paths.include?([*node[0..2], 1 - node[3]])
+        if length <= paths.branches.last.nodes.size
+          if with_goal
+            if !paths.include?([*node[0..2], 1 - node[3]])
+              break
+            end
+          else
+            break
+          end
+        end
       end
-      if paths.last_branch.nodes.size == 1
+      if paths.branches.last.nodes.size == 1
         paths.remove_branch
         false
       else
         true
       end
     }
-    add_branch.(0, 0, length.())
-    6.times do |i|
+    add_branch.(0, 0, length.(), false)
+    (loops = 600).times do |i|
       begin
         branches = paths.branches
         branch_index = rand(branches.size)
         node_index = rand(branches[branch_index].nodes.size)
-        r = add_branch.(branch_index, node_index, length.())
+        r = add_branch.(branch_index, node_index, length.(), i == loops - 1)
       end until r
     end
+    last_node = paths.branches.last.nodes.last
+    raise "invalid path" if paths.include?([*last_node[0..2], 1 - last_node[3]])
 =begin
     600.times do |i|
       # $stderr.puts(i)
@@ -166,12 +179,12 @@ module Niwatori
   def generate_rooms(paths, keys)
     connections = {}
     size = {
-      :max_x => paths.first_node[0],
-      :min_x => paths.first_node[0],
-      :max_y => paths.first_node[1],
-      :min_y => paths.first_node[1],
-      :max_z => paths.first_node[2],
-      :min_z => paths.first_node[2],
+      :max_x => paths.start_node[0],
+      :min_x => paths.start_node[0],
+      :max_y => paths.start_node[1],
+      :min_y => paths.start_node[1],
+      :max_z => paths.start_node[2],
+      :min_z => paths.start_node[2],
     }
     paths.branches.each do |branch|
       (nodes = branch.nodes).each_with_index do |node, i|
@@ -220,8 +233,8 @@ module Niwatori
     keys.each do |position|
       connections[position][:key] = true
     end
-    goal = paths.branches.max {|a, b| a.level - b.level }.nodes.last
-    return Rooms.new(connections, size, paths.first_node[0..2], goal)
+    goal_node = paths.branches.max {|a, b| a.level - b.level }.nodes.last
+    return Rooms.new(connections, size, paths.start_node[0..2], goal_node[0..2])
   end
 
   class Rooms
