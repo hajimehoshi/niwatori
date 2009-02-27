@@ -4,8 +4,9 @@ module Niwatori
 
     class Branch
 
-      def initialize(node)
+      def initialize(node, parent)
         @nodes = [node]
+        @parent = parent
       end
 
       def nodes
@@ -15,14 +16,15 @@ module Niwatori
     end
 
     def initialize(start)
-      @branches = [Branch.new([*start, 0])]
+      @branches = [Branch.new([*start, 0], nil)]
       @node_flags = {}
       @position_flags = {}
     end
 
     def add_branch(branch_index, node_index)
-      node = @branches[branch_index].nodes[node_index]
-      @branches << Branch.new(node)
+      parent_branch = @branches[branch_index]
+      node = parent_branch.nodes[node_index]
+      @branches << Branch.new(node, parent_branch)
     end
 
     def branches
