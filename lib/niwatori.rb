@@ -4,12 +4,7 @@ module Niwatori
 
     class Branch
 
-      def initialize(node, parent)
-        @nodes = [node]
-        @parent = parent
-      end
-      
-      def initialize(parent = nil, node_index = 0)
+      def initialize(paths, parent = nil, node_index = 0)
         @parent = parent
         if parent
           @nodes = [parent.nodes[node_index]]
@@ -18,8 +13,16 @@ module Niwatori
         end
       end
 
+      def add_node(node)
+        @nodes << node
+      end
+
       def nodes
         @nodes
+      end
+
+      def include?(node)
+        @nodes.include?(node)
       end
 
       def parent
@@ -41,18 +44,11 @@ module Niwatori
     end
 
     def initialize(start)
-      branch = Branch.new
+      branch = Branch.new(self, nil)
       branch.nodes << [*start, 0]
       @branches = [branch]
       @node_flags = {}
       @position_flags = {}
-    end
-
-    def add_branch(branch_index, node_index)
-      parent_branch = @branches[branch_index]
-      branch = Branch.new(parent_branch, node_index)
-      @branches << branch
-      branch
     end
 
     def branches
@@ -68,15 +64,12 @@ module Niwatori
       @branches.first.nodes.first
     end
 
-    def last_node
-      @branches.last.nodes.last
-    end
-
-    def add_node(node)
-      raise "invalid node" if node.size != 4
-      @branches.last.nodes << node
-      @node_flags[node] = true
-      @position_flags[node[0..2]] = true
+    def add_branch(branch)
+      @branches << branch
+      branch.nodes.each do |node|
+        @node_flags[node] = true
+        @position_flags[node[0..2]] = true
+      end
     end
 
     def include?(node)
@@ -115,35 +108,22 @@ module Niwatori
       next_nodes << node.dup.tap {|n| n[3] = 1 - n[3] }
       next_nodes
     }
-    add_branch = ->(branch_index, path_index, length, with_goal) {
-      paths.add_branch(branch_index, path_index)
+    add_branch = ->(branch_index, node_index, length, with_goal) {
+      parent_branch = paths.branches[branch_index]
+      branch = Paths::Branch.new(paths, parent_branch, node_index)
       loop do
-        node = paths.last_node.dup
+        node = branch.nodes.last.dup
         next_nodes = get_next_nodes.(node)
-        next_nodes.reject! {|n| paths.include?(n) }
-        if next_nodes.empty?
-          #if with_goal
-          #  return false
-          #else
-            break
-          #end
-        end
+        next_nodes.reject! {|n| paths.include?(n) or branch.include?(n) }
+        break if next_nodes.empty?
         node = next_nodes.sample
-        paths.add_node(node)
-        if length <= paths.branches.last.nodes.size
-          if with_goal
-            if !paths.include?([*node[0..2], 1 - node[3]])
-              break
-            end
-          else
-            break
-          end
-        end
+        branch.add_node(node)
+        break if length <= branch.nodes.size
       end
-      if paths.branches.last.nodes.size == 1
-        paths.remove_branch
+      if branch.nodes.size == 1
         false
       else
+        paths.add_branch(branch)
         true
       end
     }
@@ -156,24 +136,6 @@ module Niwatori
         r = add_branch.(branch_index, node_index, length.(), i == loops - 1)
       end until r
     end
-    last_node = paths.branches.last.nodes.last
-    raise "invalid path" if paths.include?([*last_node[0..2], 1 - last_node[3]])
-=begin
-    600.times do |i|
-      # $stderr.puts(i)
-      # key_nodes = (paths.positions - keys).sample(rand(2))
-      # key_count = key_nodes.size
-      # keys.push(*key_nodes)
-      begin
-        # r = add_path(paths, paths.last_path.sample[0..2], length.())
-        r = add_path(paths, paths.nodes.sample, length.())
-      end until r
-      # p keys
-      #i = 0
-      #while i < key_count
-      #end
-    end
-=end
   end
 
   def generate_rooms(paths, keys)
@@ -234,6 +196,7 @@ module Niwatori
       connections[position][:key] = true
     end
     goal_node = paths.branches.max {|a, b| a.level - b.level }.nodes.last
+    # raise "invalid goal" if paths.include?([*goal_node[0..2], 1 - goal_node[3]])
     return Rooms.new(connections, size, paths.start_node[0..2], goal_node[0..2])
   end
 
