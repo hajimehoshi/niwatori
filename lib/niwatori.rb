@@ -4,7 +4,7 @@ module Niwatori
 
     class Branch
 
-      def initialize(paths, parent = nil, node_index = 0)
+      def initialize(parent = nil, node_index = 0)
         @parent = parent
         if parent
           @nodes = [parent.nodes[node_index]]
@@ -44,7 +44,7 @@ module Niwatori
     end
 
     def initialize(start)
-      branch = Branch.new(self, nil)
+      branch = Branch.new(nil)
       branch.nodes << [*start, 0]
       @branches = [branch]
       @node_flags = {}
@@ -96,7 +96,7 @@ module Niwatori
   end
 
   def generate_paths(paths, keys)
-    length = -> { 6 + rand(5) }
+    length = -> { 4 + rand(5) }
     get_next_nodes = ->(node) {
       next_nodes = []
       next_nodes << node.dup.tap {|n| n[0] += 1 } if node[0] + 1 <= 6
@@ -110,15 +110,30 @@ module Niwatori
     }
     add_branch = ->(branch_index, node_index, length, with_goal) {
       parent_branch = paths.branches[branch_index]
-      branch = Paths::Branch.new(paths, parent_branch, node_index)
+      branch = Paths::Branch.new(parent_branch, node_index)
       loop do
         node = branch.nodes.last.dup
         next_nodes = get_next_nodes.(node)
         next_nodes.reject! {|n| paths.include?(n) or branch.include?(n) }
-        break if next_nodes.empty?
+        if next_nodes.empty?
+          if with_goal
+            inverse_node = [*node[0..2], 1 - node[3]]
+            if paths.include?(inverse_node) or branch.include?(inverse_node)
+              return false
+            end
+          end
+          break
+        end
         node = next_nodes.sample
         branch.add_node(node)
-        break if length <= branch.nodes.size
+        if length <= branch.nodes.size
+          if with_goal
+            inverse_node = [*node[0..2], 1 - node[3]]
+            break unless paths.include?(inverse_node) or branch.include?(inverse_node)
+          else
+            break
+          end
+        end
       end
       if branch.nodes.size == 1
         false
@@ -128,14 +143,20 @@ module Niwatori
       end
     }
     add_branch.(0, 0, length.(), false)
-    (loops = 600).times do |i|
+    (loops = 500).times do |i|
       begin
         branches = paths.branches
         branch_index = rand(branches.size)
         node_index = rand(branches[branch_index].nodes.size)
-        r = add_branch.(branch_index, node_index, length.(), i == loops - 1)
+        r = add_branch.(branch_index, node_index, length.(), false)
       end until r
     end
+    branch = paths.branches.max {|a, b| a.level - b.level}
+    branch_index = paths.branches.index(branch)
+    begin
+      node_index = rand(branch.nodes.size)
+      r = add_branch.(branch_index, node_index, 2, true)
+    end until r
   end
 
   def generate_rooms(paths, keys)
@@ -196,7 +217,7 @@ module Niwatori
       connections[position][:key] = true
     end
     goal_node = paths.branches.max {|a, b| a.level - b.level }.nodes.last
-    # raise "invalid goal" if paths.include?([*goal_node[0..2], 1 - goal_node[3]])
+    raise "invalid goal" if paths.include?([*goal_node[0..2], 1 - goal_node[3]])
     return Rooms.new(connections, size, paths.start_node[0..2], goal_node[0..2])
   end
 
