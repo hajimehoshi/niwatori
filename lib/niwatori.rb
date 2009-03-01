@@ -46,12 +46,12 @@ module Niwatori
 
     def next_nodes
       next_nodes = []
-      next_nodes << Node.new(Position.new(@x + 1, @y, @z), @switch) if @x + 1 <= 6
-      next_nodes << Node.new(Position.new(@x - 1, @y, @z), @switch) if -6 <= @x - 1
-      next_nodes << Node.new(Position.new(@x, @y + 1, @z), @switch) if @y + 1 <= 6
-      next_nodes << Node.new(Position.new(@x, @y - 1, @z), @switch) if -6 <= @y - 1
-      next_nodes << Node.new(Position.new(@x, @y, @z + 1), @switch) if @z + 1 <= 6
-      next_nodes << Node.new(Position.new(@x, @y, @z - 1), @switch) if -6 <= @z - 1
+      next_nodes << Node.new(Position.new(@x + 1, @y, @z), @switch) if @x + 1 <= 7
+      next_nodes << Node.new(Position.new(@x - 1, @y, @z), @switch) if -7 <= @x - 1
+      next_nodes << Node.new(Position.new(@x, @y + 1, @z), @switch) if @y + 1 <= 7
+      next_nodes << Node.new(Position.new(@x, @y - 1, @z), @switch) if -7 <= @y - 1
+      next_nodes << Node.new(Position.new(@x, @y, @z + 1), @switch) if @z + 1 <= 7
+      next_nodes << Node.new(Position.new(@x, @y, @z - 1), @switch) if -7 <= @z - 1
       next_nodes << Node.new(Position.new(@x, @y, @z), 1 - @switch)
       next_nodes
     end
