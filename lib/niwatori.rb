@@ -175,14 +175,18 @@ module Niwatori
     add_branch = ->(branch_index, node_index, length, with_goal) {
       parent_branch = paths.branches[branch_index]
       branch = Branch.new(parent_branch, node_index)
+      goal_node = paths.goal_node
+      reverse_goal_node = Node.new(goal_node.position, 1 - goal_node.switch)
       loop do
         node = branch.nodes.last.dup
         next_nodes = node.next_nodes
-        next_nodes.reject! {|n| paths.include?(n) or branch.include?(n) }
+        next_nodes.reject! do |n|
+          paths.include?(n) or branch.include?(n) or n == reverse_goal_node
+        end
         if next_nodes.empty?
           if with_goal
-            inverse_node = Node.new(node.position, 1 - node.switch)
-            if paths.include?(inverse_node) or branch.include?(inverse_node)
+            reverse_node = Node.new(node.position, 1 - node.switch)
+            if paths.include?(reverse_node) or branch.include?(reverse_node)
               return false
             end
           end
@@ -192,8 +196,8 @@ module Niwatori
         branch.add_node(node)
         if length <= branch.nodes.size
           if with_goal
-            inverse_node = Node.new(node.position, 1 - node.switch)
-            if !paths.include?(inverse_node) and !branch.include?(inverse_node)
+            reverse_node = Node.new(node.position, 1 - node.switch)
+            if !paths.include?(reverse_node) and !branch.include?(reverse_node)
               break
             end
           else
