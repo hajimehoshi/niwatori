@@ -1,51 +1,111 @@
 module Niwatori
 
-  class Paths
+  class Position
 
-    class Branch
+    attr_reader :x, :y, :z
 
-      def initialize(parent = nil, node_index = 0)
-        @parent = parent
-        if parent
-          @nodes = [parent.nodes[node_index]]
-        else
-          @nodes = []
-        end
-      end
-
-      def add_node(node)
-        @nodes << node
-      end
-
-      def nodes
-        @nodes
-      end
-
-      def include?(node)
-        @nodes.include?(node)
-      end
-
-      def parent
-        @parent
-      end
-
-      def level
-        unless @level
-          @level = 0
-          branch = self.parent
-          while branch
-            @level += 1
-            branch = branch.parent
-          end
-        end
-        @level
-      end
-
+    def initialize(x, y, z)
+      @x, @y, @z = x, y, z
     end
+
+    def ==(other)
+      other.kind_of?(Position) and 
+        @x == other.x and
+        @y == other.y and
+        @z == other.z
+    end
+    
+    def hash
+      @hash ||= ((@x + 8) << 8) | ((@y + 8) << 4) | (@z + 8)
+    end
+
+    alias :eql? :==
+
+  end
+
+  class Node
+
+    attr_reader :x, :y, :z, :position, :switch
+
+    def initialize(position, switch)
+      @position, @switch = position, switch
+      @x = position.x
+      @y = position.y
+      @z = position.z
+    end
+
+    def ==(other)
+      other.kind_of?(Node) and 
+        @position == other.position and
+        @switch == other.switch
+    end
+
+    def hash
+      @hash ||= (@switch << 12) | ((@x + 8) << 8) | ((@y + 8) << 4) | (@z + 8)
+    end
+
+    def next_nodes
+      next_nodes = []
+      next_nodes << Node.new(Position.new(@x + 1, @y, @z), @switch) if @x + 1 <= 6
+      next_nodes << Node.new(Position.new(@x - 1, @y, @z), @switch) if -6 <= @x - 1
+      next_nodes << Node.new(Position.new(@x, @y + 1, @z), @switch) if @y + 1 <= 6
+      next_nodes << Node.new(Position.new(@x, @y - 1, @z), @switch) if -6 <= @y - 1
+      next_nodes << Node.new(Position.new(@x, @y, @z + 1), @switch) if @z + 1 <= 6
+      next_nodes << Node.new(Position.new(@x, @y, @z - 1), @switch) if -6 <= @z - 1
+      next_nodes << Node.new(Position.new(@x, @y, @z), 1 - @switch)
+      next_nodes
+    end
+
+    alias eql? ==
+
+  end
+
+  class Branch
+
+    def initialize(parent = nil, node_index = 0)
+      @parent = parent
+      if parent
+        @nodes = [parent.nodes[node_index]]
+      else
+        @nodes = []
+      end
+    end
+
+    def add_node(node)
+      @nodes << node
+    end
+
+    def nodes
+      @nodes
+    end
+
+    def include?(node)
+      @nodes.include?(node)
+    end
+
+    def parent
+      @parent
+    end
+
+    def level
+      unless @level
+        @level = 0
+        branch = self.parent
+        while branch
+          @level += 1
+          branch = branch.parent
+        end
+      end
+      @level
+    end
+
+  end
+
+  class Paths
 
     def initialize(start)
       branch = Branch.new(nil)
-      branch.nodes << [*start, 0]
+      branch.nodes << Node.new(start, 0)
       @branches = [branch]
       @node_flags = {}
       @position_flags = {}
@@ -68,12 +128,12 @@ module Niwatori
       @branches << branch
       branch.nodes.each do |node|
         @node_flags[node] = true
-        @position_flags[node[0..2]] = true
+        @position_flags[node.position] = true
       end
     end
 
     def include?(node)
-      @node_flags[node]
+      @node_flags.include?(node)
     end
 
     def nodes
@@ -89,7 +149,7 @@ module Niwatori
   module_function
 
   def generate_dungeon()
-    paths = Paths.new([0, 0, 0])
+    paths = Paths.new(Position.new(0, 0, 0))
     keys = []
     generate_paths(paths, keys)
     generate_rooms(paths, keys)
@@ -97,27 +157,16 @@ module Niwatori
 
   def generate_paths(paths, keys)
     length = -> { 4 + rand(5) }
-    get_next_nodes = ->(node) {
-      next_nodes = []
-      next_nodes << node.dup.tap {|n| n[0] += 1 } if node[0] + 1 <= 6
-      next_nodes << node.dup.tap {|n| n[0] -= 1 } if -6 <= node[0] - 1
-      next_nodes << node.dup.tap {|n| n[1] += 1 } if node[1] + 1 <= 6
-      next_nodes << node.dup.tap {|n| n[1] -= 1 } if -6 <= node[1] - 1
-      next_nodes << node.dup.tap {|n| n[2] += 1 } if node[2] + 1 <= 6
-      next_nodes << node.dup.tap {|n| n[2] -= 1 } if -6 <= node[2] - 1
-      next_nodes << node.dup.tap {|n| n[3] = 1 - n[3] }
-      next_nodes
-    }
     add_branch = ->(branch_index, node_index, length, with_goal) {
       parent_branch = paths.branches[branch_index]
-      branch = Paths::Branch.new(parent_branch, node_index)
+      branch = Branch.new(parent_branch, node_index)
       loop do
         node = branch.nodes.last.dup
-        next_nodes = get_next_nodes.(node)
+        next_nodes = node.next_nodes
         next_nodes.reject! {|n| paths.include?(n) or branch.include?(n) }
         if next_nodes.empty?
           if with_goal
-            inverse_node = [*node[0..2], 1 - node[3]]
+            inverse_node = Node.new(node.position, 1 - node.switch)
             if paths.include?(inverse_node) or branch.include?(inverse_node)
               return false
             end
@@ -128,7 +177,7 @@ module Niwatori
         branch.add_node(node)
         if length <= branch.nodes.size
           if with_goal
-            inverse_node = [*node[0..2], 1 - node[3]]
+            inverse_node = Node.new(node.position, 1 - node.switch)
             break unless paths.include?(inverse_node) or branch.include?(inverse_node)
           else
             break
@@ -143,7 +192,7 @@ module Niwatori
       end
     }
     add_branch.(0, 0, length.(), false)
-    (loops = 500).times do |i|
+    1.times do |i|
       begin
         branches = paths.branches
         branch_index = rand(branches.size)
@@ -153,61 +202,56 @@ module Niwatori
     end
     branch = paths.branches.max {|a, b| a.level - b.level}
     branch_index = paths.branches.index(branch)
+=begin
     begin
       node_index = rand(branch.nodes.size)
       r = add_branch.(branch_index, node_index, 2, true)
     end until r
+=end
   end
 
   def generate_rooms(paths, keys)
     connections = {}
     size = {
-      :max_x => paths.start_node[0],
-      :min_x => paths.start_node[0],
-      :max_y => paths.start_node[1],
-      :min_y => paths.start_node[1],
-      :max_z => paths.start_node[2],
-      :min_z => paths.start_node[2],
+      :max_x => paths.start_node.x,
+      :min_x => paths.start_node.x,
+      :max_y => paths.start_node.y,
+      :min_y => paths.start_node.y,
+      :max_z => paths.start_node.z,
+      :min_z => paths.start_node.z,
     }
     paths.branches.each do |branch|
       (nodes = branch.nodes).each_with_index do |node, i|
-        position = node[0..2]
+        position = node.position
         connections[position] ||= {
           0 => [], 1 => [],
         }
-        if position[0] < size[:min_x]
-          size[:min_x] = position[0]
-        elsif size[:max_x] < position[0]
-          size[:max_x] = position[0]
-        end
-        if position[1] < size[:min_y]
-          size[:min_y] = position[1]
-        elsif size[:max_y] < position[1]
-          size[:max_y] = position[1]
-        end
-        if position[2] < size[:min_z]
-          size[:min_z] = position[2]
-        elsif size[:max_z] < position[2]
-          size[:max_z] = position[2]
+        %w(x y z).each do |d|
+          value = position.send(d)
+          if value < size[:"min_#{d}"]
+            size[:"min_#{d}"] = value
+          elsif size[:"max_#{d}"] < value
+            size[:"max_#{d}"] = value
+          end
         end
         neighbor_nodes = []
         neighbor_nodes << nodes[i-1] if 0 <= i-1
         neighbor_nodes << nodes[i+1] if nodes[i+1]
-        cs = connections[position][node[3]]
+        cs = connections[position][node.switch]
         neighbor_nodes.each do |n|
-          if node[0] - 1 == n[0]
+          if node.x - 1 == n.x
             cs << :west
-          elsif node[0] + 1 == n[0]
+          elsif node.x + 1 == n.x
             cs << :east
-          elsif node[1] - 1 == n[1]
+          elsif node.y - 1 == n.y
             cs << :north
-          elsif node[1] + 1 == n[1]
+          elsif node.y + 1 == n.y
             cs << :south
-          elsif node[2] - 1 == n[2]
+          elsif node.z - 1 == n.z
             cs << :down
-          elsif node[2] + 1 == n[2]
+          elsif node.z + 1 == n.z
             cs << :up
-          elsif node[3] != n[3]
+          elsif node.switch != n.switch
             connections[position][:switch] = true
           end
         end
@@ -217,8 +261,8 @@ module Niwatori
       connections[position][:key] = true
     end
     goal_node = paths.branches.max {|a, b| a.level - b.level }.nodes.last
-    raise "invalid goal" if paths.include?([*goal_node[0..2], 1 - goal_node[3]])
-    return Rooms.new(connections, size, paths.start_node[0..2], goal_node[0..2])
+    #raise "invalid goal" if paths.include?(Node.new(goal_node.position, 1 - goal_node.switch))
+    return Rooms.new(connections, size, paths.start_node.position, goal_node.position)
   end
 
   class Rooms
@@ -254,7 +298,6 @@ B: Blue block
 
 k: Small key
 K: Big key
-[]: Big tresure box
 
 u: Upper stair
 d: Downer stair
@@ -271,7 +314,7 @@ X: Big key door
         (@size[:min_y]..@size[:max_y]).each do |y|
           7.times { lines << "" }
           (@size[:min_x]..@size[:max_x]).each do |x|
-            if room = @connections[[x, y, z]]
+            if room = @connections[position = Position.new(x, y, z)]
               new_lines = ["  %3d   %3d  " % [x - min_x, y - min_y],
                            "  +-------+  ",
                            "  |       |  ",
@@ -279,10 +322,10 @@ X: Big key door
                            "  |       |  ",
                            "  +-------+  ",
                            "             ",]
-              if [x, y, z] == @start
+              if position == @start
                 new_lines[4][3] = "S"
               end
-              if [x, y, z] == @goal
+              if position == @goal
                 new_lines[4][3] = "G"
               end
               if room[:switch]
